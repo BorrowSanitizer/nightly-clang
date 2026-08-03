@@ -98,10 +98,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           gh release create "${{ needs.init.outputs.tag }}" \
-            --repo ${{ github.repository }} \
-            --target ${{ github.sha }} \
-            --title "Clang (${{ needs.init.outputs.llvm_sha }}) \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Clang (${{ needs.init.outputs.llvm_sha }})" \
             --notes "A build of clang that is compatible with the latest nightly Rust distribution." \
             --prerelease
           gh release upload \
