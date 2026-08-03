@@ -1,0 +1,111 @@
+# We need a version of `clang` that matches out nightly toolchain
+# to ensure compatibility between Rust, Clang, and our LLVM pass plugin.
+# This workflow uses Rust's nightly CI artifacts to build and distribute
+# clang and its headers, without having to rebuilt LLVM.
+name: clang
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: "clang-${{ github.ref }}"
+  cancel-in-progress: true
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      # the name of the latest nightly toolchain
+      toolchain: ${{ steps.nightly.outputs.toolchain }}
+      # the sha of the latest nightly toolchain
+      rust_sha: ${{ steps.nightly.outputs.rust_sha }}
+      # the sha of the llvm project submodule of the
+      # latest nightly toolchain
+      llvm_sha: ${{ steps.nightly.outputs.llvm_sha }}
+      # the name of the release artifact
+      tag: ${{ steps.nightly.outputs.tag }}
+    steps:
+    - name: Fetch nightly release info
+      id: nightly
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        base=https://static.rust-lang.org/dist
+        nightly_date=$(curl -sSfL "$base/channel-rust-nightly-date.txt")
+        rust_sha=$(curl -sSfL "$base/$nightly_date/channel-rust-nightly-git-commit-hash.txt")
+        llvm_sha=$(gh api "repos/rust-lang/rust/contents/src/llvm-project?ref=$rust_sha" --jq .sha)
+        {
+          echo "toolchain=nightly-$nightly_date"
+          echo "rust_sha=$rust_sha"
+          echo "llvm_sha=$llvm_sha"
+          echo "tag=clang-${llvm_sha:0:7}"
+        } >> "$GITHUB_OUTPUT"
+  build:
+    needs: init
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.target }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build lld
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh ${{ needs.init.outputs.llvm_sha }} ${{ needs.init.outputs.rust_sha }} ${{ matrix.config.target }} ${{ needs.init.outputs.tag }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.init.outputs.tag }}-${{ matrix.config.target }}
+          path: ${{ needs.init.outputs.tag }}.tar.xz
+          if-no-files-found: error
+          retention-days: 1
+  release:
+    name: Update rolling release
+    needs: [init, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        id: artifact_download
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Unzip doubly-compressed artifacts
+        run: |
+          find . -name "*.zip" -exec unzip -o -d . {} \;
+          find . -name "*.tar.xz"
+          ls -la
+
+      - name: Delete matching rolling release (if it exists)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "${{ needs.init.outputs.tag }}" --repo ${{ github.repository }} --yes --cleanup-tag
+
+      - name: Create and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ needs.init.outputs.tag }}" \
+            --repo ${{ github.repository }} \
+            --target ${{ github.sha }} \
+            --title "Clang (${{ needs.init.outputs.llvm_sha }}) \
+            --notes "A build of clang that is compatible with the latest nightly Rust distribution." \
+            --prerelease
+          gh release upload \
+            "${{ needs.init.outputs.tag }}" \
+            $(find . -name "*.tar.xz") \
+            --repo ${{ github.repository }} \
+            --clobber
