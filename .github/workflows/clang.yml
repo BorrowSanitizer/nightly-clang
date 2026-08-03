@@ -104,10 +104,11 @@ jobs:
           if [ ${#files[@]} -eq 0 ]; then
             exit 1
           fi
+          llvm_sha="${{ needs.init.outputs.llvm_sha }}"
           gh release create "${{ needs.init.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Clang (${{ needs.init.outputs.llvm_sha }})" \
+            --title "Clang (\`${llvm_sha:0:7}\`)" \
             --notes "A build of clang that is compatible with nightly Rust (\`${{needs.init.outputs.toolchain}}\`)." \
             --prerelease \
             "${files[@]}"
