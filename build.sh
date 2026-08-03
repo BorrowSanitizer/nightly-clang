@@ -20,7 +20,7 @@ RUSTC_SHA=$2
 TARGET=$3
 
 # we produce the file $OUTPUT.tar.xz
-OUTPUT=$4
+OUTPUT="$4-$TARGET"
 
 LLVM_ORIGIN="https://github.com/rust-lang/llvm-project.git"
 
