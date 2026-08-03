@@ -67,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ needs.init.outputs.tag }}-${{ matrix.config.target }}
-          path: ${{ needs.init.outputs.tag }}.tar.xz
+          path: ${{ needs.init.outputs.tag }}-${{ matrix.config.target }}.tar.xz
           if-no-files-found: error
           retention-days: 1
   release:
