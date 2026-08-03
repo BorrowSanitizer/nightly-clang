@@ -92,21 +92,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete "${{ needs.init.outputs.tag }}" --repo ${{ github.repository }} --yes --cleanup-tag
+          gh release delete "${{ needs.init.outputs.tag }}" --repo "${{ github.repository }}" --yes --cleanup-tag
 
       - name: Create and publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
+          files=(*.tar.xz)
+          if [ ${#files[@]} -eq 0 ]; then
+            exit 1
+          fi
           gh release create "${{ needs.init.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "Clang (${{ needs.init.outputs.llvm_sha }})" \
-            --notes "A build of clang that is compatible with the latest nightly Rust distribution." \
-            --prerelease
-          gh release upload \
-            "${{ needs.init.outputs.tag }}" \
-            $(find . -name "*.tar.xz") \
-            --repo ${{ github.repository }} \
-            --clobber
+            --notes "A build of clang that is compatible with nightly Rust (\`${{needs.init.outputs.toolchain}}\`)." \
+            --prerelease \
+            "${files[@]}"
