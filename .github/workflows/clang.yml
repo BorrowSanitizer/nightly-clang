@@ -157,6 +157,7 @@ jobs:
           git commit -am "${{ needs.init.outputs.toolchain }}"
           git push --force origin "$branch"
           llvm_sha="${{ needs.init.outputs.llvm_sha }}"
+          llvm_link="[${llvm_sha:0:7}](https://github.com/rust-lang/llvm-project/commit/$llvm_sha)"
           gh pr create --head "$branch" \
             --title "Update to \`${{ needs.init.outputs.toolchain }}\`" \
-            --body "Updates the Rust toolchain to \`${{ needs.init.outputs.toolchain }}\`, along with a compatible version of \`clang\` (\`${llvm_sha:0:7}\`)."
+            --body "Updates the Rust toolchain to \`${{ needs.init.outputs.toolchain }}\`, along with a compatible version of Clang (\`$llvm_link\`)."
