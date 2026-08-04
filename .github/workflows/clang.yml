@@ -12,6 +12,7 @@ on:
         default: false
 permissions:
   contents: write
+  pull-requests: write
 concurrency:
   group: "clang-${{ github.ref }}"
   cancel-in-progress: true
@@ -89,6 +90,8 @@ jobs:
     name: Update rolling release
     needs: [init, build]
     runs-on: ubuntu-latest
+    outputs:
+      release_url: ${{ steps.release.outputs.url }}
     steps:
       - name: Download all artifacts
         id: artifact_download
@@ -110,6 +113,7 @@ jobs:
           gh release delete "${{ needs.init.outputs.tag }}" --repo "${{ github.repository }}" --yes --cleanup-tag
 
       - name: Create and publish release
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -121,11 +125,44 @@ jobs:
             exit 1
           fi
           llvm_sha="${{ needs.init.outputs.llvm_sha }}"
-
-          gh release create "${{ needs.init.outputs.tag }}" \
+          release_url=$(gh release create "${{ needs.init.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "Clang (${llvm_sha:0:7})" \
-            --notes "A build of clang that uses the same version of LLVM as nightly Rust (\`${{needs.init.outputs.toolchain}}\`)." \
+            --notes "A build of clang that uses the same version of LLVM as nightly Rust." \
             --prerelease \
-            "${files[@]}"
+            "${files[@]}")
+          echo "url=$release_url" >> "$GITHUB_OUTPUT"
+
+  update:
+    name: Open toolchain update PR
+    needs: [init, release]
+    runs-on: ubuntu-latest
+    env:
+      TOOLCHAIN: ${{ needs.init.outputs.toolchain }}
+      RUSTC_SHA: ${{ needs.init.outputs.rust_sha }}
+      LLVM_SHA: ${{ needs.init.outputs.llvm_sha }}
+      RELEASE_URL: ${{ needs.release.outputs.release_url }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update config.toml
+        run: |
+          set -euo pipefail
+          sed -i -E "s|^([[:space:]]*rustc_sha[[:space:]]*=[[:space:]]*).*|\1\"$RUSTC_SHA\"|" config.toml
+          sed -i -E "s|^([[:space:]]*llvm_sha[[:space:]]*=[[:space:]]*).*|\1\"$LLVM_SHA\"|" config.toml
+      - name: Open PR
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            exit 0
+          fi
+          branch="toolchain/$TOOLCHAIN"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "$TOOLCHAIN"
+          git push --force origin "$branch"
+          gh pr create --head "$branch" \
+            --title "Update to $TOOLCHAIN." \
+            --body "Updates the Rust toolchain to \`$TOOLCHAIN\` using our compatible [distribution of clang]($RELEASE_URL)."
