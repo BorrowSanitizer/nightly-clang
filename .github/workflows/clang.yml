@@ -38,8 +38,8 @@ jobs:
           echo "rust_sha=$rust_sha"
           echo "llvm_sha=$llvm_sha"
           echo "nightly_date=$nightly_date"
-          echo "tag=clang/${llvm_sha:0:9}"
-          echo "artifact_prefix=clang-${llvm_sha:0:9}-$nightly_date"
+          echo "tag=clang/${llvm_sha:0:7}"
+          echo "artifact_prefix=clang-${llvm_sha:0:7}-$nightly_date"
         } >> "$GITHUB_OUTPUT"
   build:
     needs: init
@@ -111,7 +111,7 @@ jobs:
           gh release create "${{ needs.init.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Clang (${llvm_sha:0:9})" \
+            --title "Clang (${llvm_sha:0:7})" \
             --notes "A build of clang that uses the same version of LLVM as nightly Rust (\`${{needs.init.outputs.toolchain}}\`)." \
             --prerelease \
             "${files[@]}"
