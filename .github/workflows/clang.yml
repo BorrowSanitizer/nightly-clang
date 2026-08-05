@@ -141,8 +141,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "rustc_sha = \"$RUSTC_SHA\""
-            echo "llvm_sha = \"$LLVM_SHA\""
+            echo "rust_sha = \"${{ needs.init.outputs.rust_sha }}\""
+            echo "llvm_sha = \"${{ needs.init.outputs.llvm_sha }}\""
           } > config.toml
       - name: Open PR
         run: |
@@ -161,4 +161,5 @@ jobs:
           llvm_link="[\`${llvm_sha:0:7}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag)"
           gh pr create --head "$branch" \
             --title "Update to \`${{ needs.init.outputs.toolchain }}\`" \
-            --body "Updates the Rust toolchain to \`${{ needs.init.outputs.toolchain }}\`, along with a compatible version of Clang ($llvm_link)."
+            --body "Updates the Rust toolchain to \`${{ needs.init.outputs.toolchain }}\`, along with a compatible version of Clang ($llvm_link)."\
+            || echo "PR already exists."
