@@ -1,2 +1,2 @@
-rustc_sha = "0"
-llvm_sha = "0"
+rust_sha = "1ed2df61a19042f231709eb05d032ae9e2cb2084"
+llvm_sha = "52ed14fcd56afc30f9cccd8ca8ce237c2eef7e04"
