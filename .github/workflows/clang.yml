@@ -22,7 +22,7 @@ jobs:
       nightly_date: ${{ steps.nightly.outputs.nightly_date }}
       # the name of the release tag for clang
       tag: ${{ steps.nightly.outputs.tag }}
-      # a slash-free form of the tag, for artifact and file names
+      # a slash-free form of the tag for artifact and file names
       artifact_prefix: ${{ steps.nightly.outputs.artifact_prefix }}
       should_build: ${{ steps.nightly.outputs.should_build }}
     steps:
@@ -72,6 +72,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build lld
+          
       - uses: actions/checkout@v4
       
       - name: Build
@@ -114,9 +115,9 @@ jobs:
           shopt -s nullglob
           files=(*.tar.xz)
           if [ "${#files[@]}" -eq 0 ]; then
+            echo "No build artifacts found!"
             exit 1
           fi
-
           llvm_sha="${{ needs.init.outputs.llvm_sha }}"
           llvm_link="[\`${llvm_sha:0:7}\`]($GITHUB_SERVER_URL/rust-lang/llvm-project/commit/$llvm_sha)"
           gh release create "${{ needs.init.outputs.tag }}" \
@@ -139,9 +140,10 @@ jobs:
       - name: Update config.toml
         run: |
           set -euo pipefail
-          sed -i -E "s|^([[:space:]]*rustc_sha[[:space:]]*=[[:space:]]*).*|\1\"${{ needs.init.outputs.rust_sha }}\"|" config.toml
-          sed -i -E "s|^([[:space:]]*llvm_sha[[:space:]]*=[[:space:]]*).*|\1\"${{ needs.init.outputs.llvm_sha }}\"|" config.toml
-
+          {
+            echo "rustc_sha = \"$RUSTC_SHA\""
+            echo "llvm_sha = \"$LLVM_SHA\""
+          } > config.toml
       - name: Open PR
         run: |
           set -euo pipefail
